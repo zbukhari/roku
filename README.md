@@ -4,6 +4,13 @@ Simple script with crappy ASCII-ish menu for numeric keypads to manage roku.
 
 Works great for me.  Give it a shot and let me know what your take is.
 
+# Updates
+
+Fri Jan  1 18:37:21 CST 2021
+
+* Updated with ssdp to find Roku device(s) automatically will auto-connect if only one device else present a choice. Will still take an IP as an argument for a direct connect.
+* Switched to python 3 because python 2 is unsupported.
+
 # Usage
 
 Pretty straight-forward

@@ -1,19 +1,62 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Programmer: Zahid Bukhari
 # Purpose: Laziness
 # Date: Forgot.
 # Source URL: https://github.com/zbukhari/roku/
 
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
 import xml.etree.ElementTree as etree
 import argparse
+import ssdp
+import re
 
 parser = argparse.ArgumentParser()
-parser.add_argument("roku", help="Roku IP address")
+parser.add_argument("roku", help="Roku IP address", nargs='?', default=False)
 args = parser.parse_args()
-rokuServer = 'http://%s:8060' % args.roku
+
+if args.roku:
+	rokuServer = 'http://{}:8060'.format(args.roku)
+else:
+	rokuList = ssdp.discover('roku:ecp')
+
+	rokuListLen = len(rokuList)
+
+	if rokuListLen == 1:
+		rokuServer = rokuList[0].location
+	else:
+		for i in range(rokuListLen):
+			deviceInfo = urllib.request.urlopen('{}query/device-info'.format(rokuList[i].location))
+			tree = etree.parse(deviceInfo)
+			root = tree.getroot()
+			XMLOBJ = root.getchildren()
+
+			rokuInfoDict = dict(list(zip([f.tag for f in XMLOBJ], [f.text for f in XMLOBJ])))
+			rokuInfoDict['location'] = rokuList[i].location
+			rokuInfoDict['usn'] = rokuList[i].usn
+
+			if type(rokuInfoDict['friendly-device-name']) != None:
+				print(('{0}. {1} (i.e. {2} {3}), Location: {4}'.format(
+					i+1,
+					rokuInfoDict['friendly-device-name'],
+					rokuInfoDict['model-name'],
+					rokuInfoDict['model-number'],
+					rokuList[i].location)))
+			else:
+				print(('{0}. {1} {2}, Location: {3}'.format(
+					i+1,
+					rokuInfoDict['model-name'],
+					rokuInfoDict['model-number'],
+					rokuList[i].location)))
+
+		# Choose here
+		j = int(input('Enter in the number of the Roku device to connect to: '))
+
+		if j < 1 or j > len(rokuList) + 1:
+			print(('Incorrect number chosen : {}'.format(j)))
+			exit(2)
+		else:
+			rokuServer = rokuList[j - 1].location
 
 # getchar taken from https://gist.github.com/jasonrdsouza/1901709
 def getchar():
@@ -33,8 +76,8 @@ def getchar():
 def listApps():
 	"""Function to return applications from Roku as a Python data object (dictionary)"""
 
-	apps = urllib2.urlopen('%s/query/apps' % rokuServer)
-	
+	apps = urllib.request.urlopen('{}query/apps'.format(rokuServer))
+
 	tree = etree.parse(apps)
 	root = tree.getroot()
 
@@ -49,10 +92,10 @@ def listApps():
 def sendLitKeys(s):
 	"""Function to send a string (s) to Roku"""
 
-	print 'Sending %s' % s
+	print(('Sending {}'.format(s)))
 
 	for y in range(len(s)):
-		f = urllib2.urlopen('%s/keypress/Lit_%s' % (rokuServer, urllib.quote(s[y])), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}keypress/Lit_{}'.format(rokuServer, urllib.parse.quote(s[y])), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 
@@ -70,10 +113,10 @@ Valid Roku keys are: Home, Rev, Fwd, Play, Select, Up, Down, Left, Right, Down,
 
 	try:
 		x = options.index(key)
-	except ValueError, e:
+	except(ValueError, e):
 		return False
 
-	f = urllib2.urlopen('%s/keypress/%s' % (rokuServer, key), urllib.urlencode({'':''}))
+	f = urllib.request.urlopen('{}keypress/{}'.format(rokuServer, key), urllib.parse.urlencode({'':''}).encode('utf-8'))
 	z = f.read()
 	f.close()
 
@@ -92,32 +135,37 @@ install
 query/icon
 input"""
 
+	# I have no idea what I was puffing here but they all say install
 	if d['command'] == 'launch':
-		f = urllib2.urlopen('%s/launch/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}launch/{}'.format(rokuServer, d['param']), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 	elif d['command'] == 'install':
-		f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}install/{}'.format(rokuServer, d['param']), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 	elif d['command'] == 'query/apps':
-		f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}install/{}'.format(rokuServer, d['param']), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 	elif d['command'] == 'keydown':
-		f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		# f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}install/{}'.format(rokuServer, d['param']), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 	elif d['command'] == 'keyup':
-		f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		# f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}install/{}'.format(rokuServer, d['param']), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 	elif d['command'] == 'keyDownUp':
-		f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		# f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}install/{}'.format(rokuServer, d['param']), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 	elif d['command'] == 'query/icon':
-		f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		# f = urllib2.urlopen('%s/install/%d' % (rokuServer, d['param']), urllib.urlencode({'':''}))
+		f = urllib.request.urlopen('{}install/{}'.format(rokuServer, d['param']), urllib.parse.urlencode({'':''}))
 		z = f.read()
 		f.close()
 
@@ -125,62 +173,63 @@ input"""
 
 if __name__ == '__main__':
 	while True:
-		print """You want to primarily use the numeric keypad but it's your choice.
+		print(("""Connected to {}
 
-|-------|-------|-------|-------|
-|       |   /   |   -   |   *   |       Other keys:
-|       |       | Volume| INFO  |
-|       | SEARCH| Down  |       |       Key => Action
-|-------|-------|-------|-------|       ---------------------------------
-|   7   |   8   |   9   |   +   |       S   => Send a string
-|  <--  |   ^   |   @   | Volume|       l   => List applications
-| BACK  |  UP   | HOME  | Up    |       L   => Launch application
-|-------|-------|-------|       |       I   => Install application
-|   4   |   5   |   6   |       |       q   => Quit
-|   <   |   OK  |   >   |       |       _   => VolumeMute (underscore)
-| LEFT  | SELECT| RIGHT |       |
-|-------|-------|-------|-------|
-|   1   |   2   |   3   |       |
-|  <<   |   \/  |   >>  | Enter |
-| REWIND| DOWN  | F-FWD |       |
-|-------|-------|-------|   or  |
-|       0       |   .   |       |
-|     |> / ||   |  <<-  | Return|
-|  PLAY / PAUSE | REPLAY|       |
-|---------------|-------|-------|
+    101/104/105 key friendly            Alternate laptop friendly
+|-------|-------|-------|-------|   |-------|-------|-------|-------|
+|       |   /   |   -   |   *   |   |       |   /   |   -   |   *   |   Other keys:
+|       |       | Volume| INFO  |   |       |       | Volume| INFO  |
+|       | SEARCH| Down  |       |   |       | SEARCH| Down  |       |   Key => Action
+|-------|-------|-------|-------|   |-------|-------|-------|-------|   ---------------------------------
+|   7   |   8   |   9   |   +   |   |  r/R  |  t/T  |  y/Y  |   +   |  s/S  => Send a string
+|  <--  |   ^   |   @   | Volume|   |  <--  |   ^   |   @   | Volume|   l   => List applications
+| BACK  |  UP   | HOME  | Up    |   | BACK  |  UP   | HOME  | Up    |   L   => Launch application
+|-------|-------|-------|       |   |-------|-------|-------|       |  i/I  => Install application
+|   4   |   5   |   6   |       |   |  f/F  |  g/G  |  h/H  |       |  q/Q  => Quit
+|   <   |   OK  |   >   |       |   |   <   |   OK  |   >   |       |   _   => VolumeMute (underscore)
+| LEFT  | SELECT| RIGHT |       |   | LEFT  | SELECT| RIGHT |       |
+|-------|-------|-------|-------|   |-------|-------|-------|-------|
+|   1   |   2   |   3   |       |   |  v/V  |  b/B  |  n/N  |       |
+|  <<   |   \/  |   >>  | Enter |   |  <<   |   \/  |   >>  | Enter |
+| REWIND| DOWN  | F-FWD |       |   | REWIND| DOWN  | F-FWD |       |
+|-------|-------|-------|   or  |   |-------|-------|-------|   or  |
+|       0       |   .   |       |   |    [SPACE]    |   .   |       |
+|     |> / ||   |  <<-  | Return|   |     |> / ||   |  <<-  | Return|
+|  PLAY / PAUSE | REPLAY|       |   |  PLAY / PAUSE | REPLAY|       |
+|---------------|-------|-------|   |---------------|-------|-------|
 
-Please enter a key: """
+Please enter a key: """.format(rokuServer)))
 
 		c = getchar()
 
 		if len(c) != 1:
-			print 'Invalid number of characters and or invalid option'
+			print('Invalid number of characters and or invalid option')
 			continue
 
 		# Interface
-		if c == '8':
+		if c in ['8','t','T']:
 			sendKeys2ECP('Up')
-		elif c == '2':
+		elif c in ['2','b','B']:
 			sendKeys2ECP('Down')
-		elif c == '4':
+		elif c in ['4','f','F']:
 			sendKeys2ECP('Left')
-		elif c == '6':
+		elif c in ['6','h','H']:
 			sendKeys2ECP('Right')
-		elif c == '5':
+		elif c in ['5','g','G']:
 			sendKeys2ECP('Select')
-		elif c == '9':
+		elif c in ['9','y','Y']:
 			sendKeys2ECP('Home')
-		elif c == '7':
+		elif c in ['7','r','R']:
 			sendKeys2ECP('Back')
 		elif c == '*':
 			sendKeys2ECP('Info')
 	
 		# Playback
-		elif c == '0':
+		elif c in ['0',' ']:
 			sendKeys2ECP('Play')
-		elif c == '1':
+		elif c in ['1','v','V']:
 			sendKeys2ECP('Rev')
-		elif c == '3':
+		elif c in ['3','n','N']:
 			sendKeys2ECP('Fwd')
 		elif c == '.':
 			sendKeys2ECP('InstantReplay')
@@ -196,21 +245,22 @@ Please enter a key: """
 			sendKeys2ECP('Enter')
 		elif c == '/':
 			sendKeys2ECP('Search')
-		elif c == 'S':
-			s = raw_input('Enter string: ')
+		elif c in ['s','S']:
+			s = input('Enter string: ')
 			sendLitKeys(s)
 		elif c == 'l':
 			apps = listApps()
-			print map(lambda f: '%s %s' % (f['id'], f['value']), apps)
+			for l in ['{} {}'.format(f['id'], f['value']) for f in apps]:
+				print(l)
 		elif c == 'L':
-			appid = int(raw_input('Enter application ID: '))
+			appid = int(input('Enter application ID: '))
 			ecpSvcs(command='launch', param=appid)
-		elif c == 'I':
-			appid = int(raw_input('Enter application ID: '))
+		elif c in ['i','I']:
+			appid = int(input('Enter application ID: '))
 			ecpSvcs(command='install', param=appid)
 		elif c == '*':
 			sendKeys2ECP('Info')
-		elif c == 'q' or c == 'Q':
+		elif c in ['q','Q']:
 			break
 		else:
-			print 'Invalid choice. Try again.'
+			print('Invalid choice. Try again.')
